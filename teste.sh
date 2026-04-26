@@ -1,238 +1,144 @@
 #!/bin/bash
 
-# =================================================================
-# 1. ATUALIZANDO OS PACOTES DO SISTEMA
-# =================================================================
-sudo dnf upgrade -y
+# ==========================================
+# FUNÇÃO: AGUARDAR INTERNET
+# ==========================================
+check_internet() {
+    echo "Verificando conexão com a internet..."
+    while ! ping -c 1 google.com &> /dev/null
+    do
+        echo "Sem internet... tentando novamente em 5s"
+        sleep 5
+    done
+    echo "Internet OK!"
+}
 
-echo "Atualizacao concluida com sucesso!"
+# ==========================================
+# FUNÇÃO: RETRY (TENTAR NOVAMENTE)
+# ==========================================
+retry() {
+    n=0
+    until [ $n -ge 5 ]
+    do
+        "$@" && break
+        n=$((n+1))
+        echo "Erro... tentando novamente ($n/5)"
+        sleep 3
+    done
+}
 
-# =================================================================
-# 2. INSTALANDO E HABILITANDO O MARIADB
-# =================================================================
-sudo dnf install mariadb-server -y
+# ==========================================
+# INÍCIO
+# ==========================================
+check_internet
+
+echo "Atualizando sistema..."
+retry sudo dnf upgrade -y
+
+# ==========================================
+# MARIADB
+# ==========================================
+retry sudo dnf install mariadb-server -y
 sudo systemctl enable --now mariadb
 
-echo "Servidor de banco de dados instalado com sucesso!"
-echo "Serviço do mariadb execução! obs: [active] em verde"
-
-# =================================================================
-# 3. AUTOMAÇÃO DA SEGURANÇA 
-# =================================================================
 DB_ROOT_PASS="Senac2026"
 DB_GLPI_PASS="glpiDBSecret"
 
-echo "Configurando a segurança do MariaDB de forma automática..."
+echo "Configurando MariaDB..."
 
-# Define a senha do root e limpa usuários/bancos de teste
-sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
-sudo mysql -e "DELETE FROM mysql.user WHERE User='';"
-sudo mysql -e "DROP DATABASE IF EXISTS test;"
-sudo mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-sudo mysql -e "FLUSH PRIVILEGES;"
-
-# =================================================================
-# 4. CRIAÇÃO DO BANCO E USUÁRIO DO GLPI
-# Usamos o 'Heredoc' (<<EOF) para mandar todos os comandos de uma vez.
-# =================================================================
-echo "Criando o banco de dados 'glpi' / glpi= a user glpiDBSecret= Senha secreta"
-
-sudo mysql -u root -p"$DB_ROOT_PASS" <<EOF
-CREATE USER 'glpi'@'%' IDENTIFIED BY '$DB_GLPI_PASS';
-GRANT USAGE ON *.* TO 'glpi'@'%' IDENTIFIED BY '$DB_GLPI_PASS';
-CREATE DATABASE IF NOT EXISTS \`glpi\`;
-GRANT ALL PRIVILEGES ON \`glpi\`.* TO 'glpi'@'%';
+sudo mysql <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASS}';
+DELETE FROM mysql.user WHERE User='';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
-EXIT;
 EOF
 
-# =================================================================
-# 5. Instalação Repositório EPEL (Fornecem as versões mais recentes do PHP)
-# =================================================================
-sudo dnf install epel-release -y    
+# ==========================================
+# BANCO GLPI
+# ==========================================
+sudo mysql -u root -p"${DB_ROOT_PASS}" <<EOF
+CREATE DATABASE IF NOT EXISTS glpi;
+CREATE USER IF NOT EXISTS 'glpi'@'%' IDENTIFIED BY '${DB_GLPI_PASS}';
+GRANT ALL PRIVILEGES ON glpi.* TO 'glpi'@'%';
+FLUSH PRIVILEGES;
+EOF
+
+# ==========================================
+# PHP + APACHE
+# ==========================================
+retry sudo dnf install epel-release -y
 sudo dnf module reset php -y
 
-echo "Repositório EPEL instalado e módulo PHP resetado com sucesso!"
+retry sudo dnf install -y httpd php php-opcache php-apcu php-mysqli php-mbstring php-gd php-intl php-xml php-bz2 php-curl php-zip php-bcmath composer git nodejs gettext
 
-# =================================================================
-# 6. Instalação do PHP e apache
-# =================================================================
-sudo dnf -y install httpd php php-opcache php-apcu php-mysqli php-mbstring php-gd php-intl php-xml php-simplexml php-dom php-pecl-apcu php-bz2 php-curl php-zip php-bcmath
 sudo systemctl enable --now httpd
 
-echo "Servidor web Apache e PHP instalados com sucesso!"
+# ==========================================
+# FIREWALL
+# ==========================================
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
 
-# =================================================================
-# 7. Regras de firewall para permitir o tráfego HTTP e HTTPS
-# =================================================================
-sudo firewall-cmd --zone=public --add-service=http --permanent
-sudo firewall-cmd --permanent --add-service=https  
-sudo firewall-cmd --reload 
-
-echo "Regras de firewall configuradas para HTTP e HTTPS!"
-
-# =================================================================
-# 8. SELINUX: Configurando o SELinux para permitir que o Apache acesse os arquivos do GLPI
-# =================================================================
+# ==========================================
+# SELINUX
+# ==========================================
 sudo setsebool -P httpd_can_network_connect on
 sudo setsebool -P httpd_can_network_connect_db on
-sudo setsebool -P httpd_can_sendmail on 
 
-echo "Configurações do SELinux aplicadas para o Apache!"
+# ==========================================
+# DOWNLOAD GLPI
+# ==========================================
+cd /usr/share
+retry sudo git clone https://github.com/glpi-project/glpi.git
 
-# =================================================================
-# 9. Instalar git e baixar o GLPI
-# =================================================================
-sudo dnf install git -y 
-cd /usr/share/
-
-echo "Baixando o código fonte do GLPI usando git..."
-
-#=================================================================
-# 10. Baixando o código fonte atualizado direto do projeto oficial
-#=================================================================
-sudo git clone https://github.com/glpi-project/glpi.git 
-
-cd /usr/share/glpi 
-
-echo "Código fonte do GLPI baixado com sucesso!"
-
-#=================================================================
-# 11. Instalando pacotes do SO necessários para compilação e dependências
-#=================================================================
-sudo dnf install composer patch nodejs gettext -y    
-
-echo "Pacotes necessários para o GLPI instalados com sucesso!"
-
-#=================================================================
-# 12. Configuração vitalícia para o git não reclamar de diretórios de outros usuários
-#=================================================================
-sudo git config --system --add safe.directory /usr/share/glpi 
-sudo chown -R apache:apache /usr/share/httpd 
-sudo -u apache git config --global --add safe.directory /usr/share/glpi 
-sudo git config --system --add safe.directory /usr/share/glpi 
-
-echo "Configurações do git aplicadas para o diretório do GLPI!"
-
-#=================================================================
-# 13. Cria a pasta de cache se não existir e define o dono
-#=================================================================
-sudo mkdir -p /usr/share/httpd/.npm 
-sudo chown -R apache:apache /usr/share/httpd 
-
-echo "Pasta de cache criada e permissões definidas para o Apache!"
-
-#=================================================================
-# 14. Limpando módulos velhos (caso existam) e instalando as dependências do projeto
-#=================================================================
 cd /usr/share/glpi
-sudo rm -rf /usr/share/glpi/node modules
 
-echo "Instalando as dependências do projeto GLPI usando composer e npm..."
-
-#=================================================================
-# 15. Define o dono de tudo como apache (O servidor web)
-#=================================================================
+# ==========================================
+# PERMISSÕES
+# ==========================================
 sudo chown -R apache:apache /usr/share/glpi
+
+# ==========================================
+# DEPENDÊNCIAS
+# ==========================================
+sudo rm -rf node_modules
 sudo -u apache php bin/console dependencies install
 
-echo "Dependências do GLPI instaladas com sucesso!"
+# ==========================================
+# PERMISSÕES IMPORTANTES
+# ==========================================
+sudo chmod -R 775 files config marketplace public
 
-#=================================================================
-# 16. Permissões de pasta para o GLPI
-#=================================================================
-sudo chmod -R 775 /usr/share/glpi/files
-sudo chmod -R 775 /usr/share/glpi/config
-sudo chmod -R 775 /usr/share/glpi/marketplace
-sudo chmod -R 775 /usr/share/glpi/public
+# ==========================================
+# SELINUX CONTEXTO
+# ==========================================
+sudo chcon -R -t httpd_sys_rw_content_t files config marketplace public
 
-echo "Permissões de pasta para o GLPI configuradas com sucesso!"
-
-#=================================================================
-# 17. SELinux reforçado para Fedora 43 Server
-#=================================================================
-sudo setsebool -P httpd_can_network_connect on
-sudo setsebool -P httpd_can_network_connect_db on
-
-echo "Configurações do SELinux reforçadas para o Fedora 43 Server!"
-
-#=================================================================
-# 18. Aplicando o contexto de leitura e escrita nas pastas de dados
-#=================================================================
-sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/files
-sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/config
-sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/marketplace
-sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/public 
-
-echo "Contexto de leitura e escrita aplicado nas pastas de dados do GLPI!"
-
-#=================================================================
-# 19. Criando e Editando o Arquivo de Configuração
-#=================================================================
-sudo vi /etc/httpd/conf.d/glpi.conf
-i 
-# 1. Apontando para a pasta PUBLIC (Requisito do GLPI 10)
-Alias /glpi "/usr/share/glpi/public"
-
-<Directory "/usr/share/glpi/public">
-    Options FollowSymLinks
-    # AllowOverride All é crucial para o redirecionamento do index.php
-    AllowOverride All
-    Require all granted
-
-    # Forçar o roteamento para o index.php (caso o .htaccess falhe)
-    <IfModule mod_rewrite.c>
-        RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteRule ^(.*)$ index.php [QSA,L]
-    </IfModule>
-</Directory>
-
-# 2. Corrigindo o acesso ao Install
-<Directory "/usr/share/glpi/install">
-    <IfModule mod_authz_core.c>
-        # Permitir acesso local E da sua rede para conseguir instalar
-        Require local
-        Require ip 192.168.12.0/24 
-    </IfModule>
-</Directory>
-ESC 
-:wq
-
-echo "Arquivo de configuração do Apache para o GLPI criado e editado com sucesso!"
-
-#=================================================================
-# 20. Fora do glpi.conf
-#=================================================================
-cd
+# ==========================================
+# CRON
+# ==========================================
 echo "* * * * * apache /usr/bin/php /usr/share/glpi/front/cron.php &>/dev/null" | sudo tee /etc/cron.d/glpi
 
-echo "Tarefa cron para o GLPI criada com sucesso!"
-
-#=================================================================
-# 21. Reiniciar o Apache para ler o novo arquivo glpi.conf e aplicar as mudanças
-#=================================================================
+# ==========================================
+# RESTART APACHE
+# ==========================================
 sudo systemctl restart httpd
 
-echo "Servidor Apache reiniciado para aplicar as configurações do GLPI!"
+# ==========================================
+# FINAL
+# ==========================================
+echo "======================================="
+echo "GLPI instalado com sucesso!"
+echo "Acesse: http://IP_DO_SERVIDOR/glpi"
+echo "======================================="
 
-#=================================================================
-# 22. Mensagem final de sucesso
-#=================================================================
-
-echo "Instalação do GLPI concluída com sucesso! Agora acesse http://ip_do_servidor/glpi para finalizar."
-
-# Disclaimer (Aviso): Se ocorrer algum erro, mande estes comandos 
-#sudo chown -R apache:apache /usr/share/glpi
-#sudo setenforce 0
-# (DESABILITE O SELINUX TEMPORARIAMENTE)
-
-# DEPOIS REATIVE COM 
-#sudo setenforce 1
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/config
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/files
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/marketplace
-
-# É provavel que ainda falte o LDAP, então depois de reativar o SELINUX e o httpd.
-#sudo dnf install php-ldap -y
-#sudo systemctl restart httpd
+# ==========================================
+# CONFIG MANUAL (DEIXADO POR ÚLTIMO)
+# ==========================================
+echo ""
+echo "AGORA EXECUTE MANUALMENTE:"
+echo "sudo vi /etc/httpd/conf.d/glpi.conf"
+echo ""
+echo "Cole a configuração do Apache que você já criou."
