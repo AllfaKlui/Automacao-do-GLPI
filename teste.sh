@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Salva o local onde o repositório foi baixado
+PASTA_DO_GIT=$(pwd)
+
 # =================================================================
 # 1. ATUALIZANDO OS PACOTES DO SISTEMA
 # =================================================================
@@ -166,28 +169,23 @@ sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/public
 
 echo "Contexto de leitura e escrita aplicado nas pastas de dados do GLPI!"
 
-#=================================================================
-# 19. CONFIGURAÇÃO DO APACHE (MÉTODO DE CÓPIA)
-#=================================================================
-echo "Copiando arquivo de configuração pré-definido..."
+# =================================================================
+# 19. CONFIGURAÇÃO DO APACHE (SEM ERROS DE CAMINHO)
+# =================================================================
+echo "Configurando o Apache..."
 
-# Descobre onde o script está rodando para não errar o caminho do arquivo
-DIR_ATUAL=$(dirname "$(readlink -f "$0")")
-
-if [ -f "$DIR_ATUAL/glpi_apache.conf" ]; then
-    # Se o arquivo existir, faz a configuração
-    sudo cp "$DIR_ATUAL/glpi_apache.conf" /etc/httpd/conf.d/glpi.conf
+# Usamos a variável que criamos lá no topo
+if [ -f "$PASTA_DO_GIT/glpi_apache.conf" ]; then
+    sudo cp "$PASTA_DO_GIT/glpi_apache.conf" /etc/httpd/conf.d/glpi.conf
     sudo restorecon -v /etc/httpd/conf.d/glpi.conf
     
-    # Reinicia o serviço e aplica sua correção de firewall
+    # Suas correções de firewall e restart
     sudo systemctl restart httpd
     sudo firewall-cmd --add-service=http --permanent
     sudo firewall-cmd --reload
-    
-    echo "Apache e Firewall configurados com sucesso!"
+    echo "Sucesso! Configuração aplicada."
 else
-    # SE NÃO EXISTIR, aí sim ele avisa o erro e para
-    echo "ERRO: O arquivo glpi_apache.conf não foi encontrado em $DIR_ATUAL"
+    echo "ERRO: O arquivo glpi_apache.conf não foi encontrado em $PASTA_DO_GIT"
     exit 1
 fi
 
