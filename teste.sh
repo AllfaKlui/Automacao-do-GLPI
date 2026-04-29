@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Salva o local onde o repositório foi baixado
-PASTA_DO_GIT=$(pwd)
+PASTA_DO_GIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # =================================================================
 # 1. ATUALIZANDO OS PACOTES DO SISTEMA
