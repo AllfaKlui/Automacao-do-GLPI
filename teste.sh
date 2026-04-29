@@ -167,39 +167,18 @@ sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/public
 echo "Contexto de leitura e escrita aplicado nas pastas de dados do GLPI!"
 
 #=================================================================
-# 19. Criando e Editando o Arquivo de Configuração
+# 19. CONFIGURAÇÃO DO APACHE (MÉTODO DE CÓPIA)
 #=================================================================
-sudo vi /etc/httpd/conf.d/glpi.conf
-i 
-# 1. Apontando para a pasta PUBLIC (Requisito do GLPI 10)
-Alias /glpi "/usr/share/glpi/public"
+echo "Copiando arquivo de configuração pré-definido..."
 
-<Directory "/usr/share/glpi/public">
-    Options FollowSymLinks
-    # AllowOverride All é crucial para o redirecionamento do index.php
-    AllowOverride All
-    Require all granted
+# O comando 'cp' faz a cópia do arquivo que está na pasta atual para a pasta do Apache
+sudo cp ./glpi_apache.conf /etc/httpd/conf.d/glpi.conf
 
-    # Forçar o roteamento para o index.php (caso o .htaccess falhe)
-    <IfModule mod_rewrite.c>
-        RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteRule ^(.*)$ index.php [QSA,L]
-    </IfModule>
-</Directory>
+# Ajusta o contexto do SELinux para o Apache conseguir ler o novo arquivo
+sudo restorecon -v /etc/httpd/conf.d/glpi.conf
 
-# 2. Corrigindo o acesso ao Install
-<Directory "/usr/share/glpi/install">
-    <IfModule mod_authz_core.c>
-        # Permitir acesso local E da sua rede para conseguir instalar
-        Require local
-        Require ip 192.168.12.0/24 
-    </IfModule>
-</Directory>
-ESC 
-:wq
-
-echo "Arquivo de configuração do Apache para o GLPI criado e editado com sucesso!"
+# Reinicia o serviço para aplicar
+sudo systemctl restart httpd
 
 #=================================================================
 # 20. Fora do glpi.conf
