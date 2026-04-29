@@ -175,14 +175,21 @@ echo "Copiando arquivo de configuração pré-definido..."
 DIR_ATUAL=$(dirname "$(readlink -f "$0")")
 
 if [ -f "$DIR_ATUAL/glpi_apache.conf" ]; then
-    # Copia o arquivo usando o caminho absoluto
+    # Se o arquivo existir, faz a configuração
     sudo cp "$DIR_ATUAL/glpi_apache.conf" /etc/httpd/conf.d/glpi.conf
-    
-    # Ajusta o SELinux para o Apache conseguir ler
     sudo restorecon -v /etc/httpd/conf.d/glpi.conf
-
-# Reinicia o serviço para aplicar
-sudo systemctl restart httpd
+    
+    # Reinicia o serviço e aplica sua correção de firewall
+    sudo systemctl restart httpd
+    sudo firewall-cmd --add-service=http --permanent
+    sudo firewall-cmd --reload
+    
+    echo "Apache e Firewall configurados com sucesso!"
+else
+    # SE NÃO EXISTIR, aí sim ele avisa o erro e para
+    echo "ERRO: O arquivo glpi_apache.conf não foi encontrado em $DIR_ATUAL"
+    exit 1
+fi
 
 #=================================================================
 # 20. Fora do glpi.conf
