@@ -196,22 +196,17 @@ sudo systemctl restart httpd
 echo "Servidor Apache reiniciado para aplicar as configurações do GLPI!"
 
 #=================================================================
+# 22. Adiciona permissão para o serviço HTTP e HTTPS
+#=================================================================
+# Adiciona permissão para o serviço HTTP e HTTPS
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+
+echo "Permissões para HTTP e HTTPS adicionadas ao firewall com sucesso!"
+
+#=================================================================
 # 22. Mensagem final de sucesso
 #=================================================================
 
 echo "Instalação do GLPI concluída com sucesso! Agora acesse http://ip_do_servidor/glpi para finalizar."
-
-# Disclaimer (Aviso): Se ocorrer algum erro, mande estes comandos 
-#sudo chown -R apache:apache /usr/share/glpi
-#sudo setenforce 0
-# (DESABILITE O SELINUX TEMPORARIAMENTE)
-
-# DEPOIS REATIVE COM 
-#sudo setenforce 1
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/config
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/files
-#sudo chcon -R -t httpd_sys_rw_content_t /usr/share/glpi/marketplace
-
-# É provavel que ainda falte o LDAP, então depois de reativar o SELINUX e o httpd.
-#sudo dnf install php-ldap -y
-#sudo systemctl restart httpd
