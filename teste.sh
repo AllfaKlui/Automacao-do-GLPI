@@ -171,11 +171,15 @@ echo "Contexto de leitura e escrita aplicado nas pastas de dados do GLPI!"
 #=================================================================
 echo "Copiando arquivo de configuração pré-definido..."
 
-# O comando 'cp' faz a cópia do arquivo que está na pasta atual para a pasta do Apache
-sudo cp ./glpi_apache.conf /etc/httpd/conf.d/glpi.conf
+# Descobre onde o script está rodando para não errar o caminho do arquivo
+DIR_ATUAL=$(dirname "$(readlink -f "$0")")
 
-# Ajusta o contexto do SELinux para o Apache conseguir ler o novo arquivo
-sudo restorecon -v /etc/httpd/conf.d/glpi.conf
+if [ -f "$DIR_ATUAL/glpi_apache.conf" ]; then
+    # Copia o arquivo usando o caminho absoluto
+    sudo cp "$DIR_ATUAL/glpi_apache.conf" /etc/httpd/conf.d/glpi.conf
+    
+    # Ajusta o SELinux para o Apache conseguir ler
+    sudo restorecon -v /etc/httpd/conf.d/glpi.conf
 
 # Reinicia o serviço para aplicar
 sudo systemctl restart httpd
