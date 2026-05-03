@@ -220,5 +220,5 @@ echo "Permissões para HTTP e HTTPS adicionadas ao firewall com sucesso!"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
 echo " A interface web já está aguardando conexões."
-echo " 👉 Acesse o link: http://$SERVER_IP/zabbix"
+echo " 👉 Acesse o link: http://$SERVER_IP/glpi"
 echo "========================================================"
