@@ -217,5 +217,8 @@ echo "Permissões para HTTP e HTTPS adicionadas ao firewall com sucesso!"
 #=================================================================
 # 22. Mensagem final de sucesso
 #=================================================================
+SERVER_IP=$(hostname -I | awk '{print $1}')
 
-echo "Instalação do GLPI concluída com sucesso! Agora acesse http://ip_do_servidor/glpi para finalizar."
+echo " A interface web já está aguardando conexões."
+echo " 👉 Acesse o link: http://$SERVER_IP/zabbix"
+echo "========================================================"
