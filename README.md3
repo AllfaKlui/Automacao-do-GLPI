@@ -1,0 +1,35 @@
+﻿# Automação do GLPI 10 no Fedora Server
+
+Projeto de infraestrutura e automação desenvolvido com base nas aulas da instituição Senac (Presidente Prudente). O objetivo deste repositório é fornecer um ambiente GLPI 10 funcional com 100% de automação via Shell Script, focado em agilidade e padronização.
+
+Atualmente, o projeto não possui planos para formato PKG, mas conta com este script de execução direta e uma documentação de instalação manual completa.
+
+## ⚠️ Aviso Importante (Máquinas Virtuais Feitas em Casa)
+
+Se você estiver rodando este projeto em uma Máquina Virtual (como VMware ou VirtualBox), é crucial que a **Placa de Rede esteja configurada em modo Bridge**. Sem isso, a máquina não pegará um IP da sua rede local e você não conseguirá acessar a interface web do GLPI.
+
+**Como configurar o Bridge no VMware:**
+1. No menu superior, vá em `Edit` > `Virtual Network Editor` > `Change Settings`.
+2. Em `VMnet Information`, selecione `Bridged to:` e escolha a sua placa de rede física (Você pode conferir o nome dela no Windows em Rede e Internet > Ethernet > Descrição).
+3. Com a VM rodando (ex: Fedora 43 Server), vá no menu superior: `VM` > `Removable Devices` > `Network Adapter`. Se a opção `Disconnect` estiver visível, sua conexão está ativa e correta.
+4. Reinicie a Máquina Virtual por garantia.
+
+## 🚀 Como Usar a Versão Automatizada
+
+Se você deseja subir o servidor GLPI rapidamente, execute os comandos abaixo no terminal do seu servidor Fedora:
+
+1. Instale o Git:
+   `sudo dnf install git -y`
+
+2. Baixe este repositório:
+   `sudo git clone https://github.com/AllfaKlui/Automacao-do-GLPI.git`
+   
+   `cd Automacao-do-GLPI`
+
+3. Dê permissão e execute o script:
+   `sudo chmod +x setup_glpi.sh`
+   `./setup_glpi.sh`
+
+Após a conclusão, acesse no navegador da sua máquina física: `http://<IP_DO_SEU_SERVIDOR>/glpi`
+
+> **Nota:** Prefere fazer a instalação passo a passo para fins de estudo? Consulte o arquivo [INSTALACAO_MANUAL.md](INSTALACAO_MANUAL.md) disponível neste repositório.
